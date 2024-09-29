@@ -1,12 +1,20 @@
 package com.example.employee.controller;
 
-import com.example.employee.model.Employee;
-import com.example.employee.service.EmployeeService;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.employee.model.Employee;
+import com.example.employee.model.TaxDetails;
+import com.example.employee.service.EmployeeService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/employees")
@@ -15,18 +23,15 @@ public class EmployeeController {
     @Autowired
     private EmployeeService employeeService;
 
-    // Endpoint to store employee details
     @PostMapping
-    public ResponseEntity<Employee> createEmployee(@Valid @RequestBody Employee employee) {
-        Employee savedEmployee = employeeService.saveEmployee(employee);
-        return new ResponseEntity<>(savedEmployee, HttpStatus.CREATED);
+    public ResponseEntity<String> createEmployee(@Valid @RequestBody Employee employee) {
+        employeeService.saveEmployee(employee);
+        return ResponseEntity.status(HttpStatus.CREATED).body("Employee created successfully");
     }
 
-    // Endpoint to return tax deductions for a specific employee
     @GetMapping("/{employeeId}/tax-deductions")
-    public ResponseEntity<Employee> getEmployeeTaxDeductions(@PathVariable String employeeId) {
-        Employee employee = employeeService.getTaxDeductions(employeeId);
-        return new ResponseEntity<>(employee, HttpStatus.OK);
+    public ResponseEntity<TaxDetails> getTaxDeductions(@PathVariable String employeeId) {
+        TaxDetails taxDetails = employeeService.calculateTaxDeductions(employeeId);
+        return ResponseEntity.ok(taxDetails);
     }
 }
-

@@ -2,12 +2,12 @@ package com.example.employee.service;
 
 import com.example.employee.exception.EmployeeNotFoundException;
 import com.example.employee.model.Employee;
+import com.example.employee.model.TaxDetails;
 import com.example.employee.repository.EmployeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.Month;
 import java.time.temporal.ChronoUnit;
 
 @Service
@@ -16,77 +16,45 @@ public class EmployeeService {
     @Autowired
     private EmployeeRepository employeeRepository;
 
-    public Employee saveEmployee(Employee employee) {
-        // Additional validations can be added if needed
-        return employeeRepository.save(employee);
+    public void saveEmployee(Employee employee) {
+        if (employeeRepository.existsById(employee.getEmployeeId())) {
+            throw new IllegalArgumentException("Employee ID already exists");
+        }
+        employeeRepository.save(employee);
     }
 
- // Method to get tax deductions based on employee ID
-    public Employee getTaxDeductions(String employeeId) {
-        // Retrieve employee from the database
+    public TaxDetails calculateTaxDeductions(String employeeId) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new EmployeeNotFoundException("Employee not found"));
 
-        // Calculate the yearly salary based on DOJ and monthly salary
-        double yearlySalary = calculateYearlySalary(employee.getDoj(), employee.getSalary());
-        
-        // Calculate tax based on tax slabs
-        double taxAmount = calculateTaxAmount(yearlySalary);
-        
-        // Calculate cess if applicable
+        double yearlySalary = calculateYearlySalary(employee);
+        double taxAmount = calculateTax(yearlySalary);
         double cessAmount = calculateCess(yearlySalary);
 
-        // Set the calculated values to the employee object
-        employee.setYearlySalary(yearlySalary);
-        employee.setTaxAmount(taxAmount);
-        employee.setCessAmount(cessAmount);
-
-        // Return the employee with calculated tax details
-        return employee;
+        return new TaxDetails(employeeId, employee.getFirstName(), employee.getLastName(), yearlySalary, taxAmount, cessAmount);
     }
 
-    // Calculate yearly salary based on the date of joining and monthly salary
-    private double calculateYearlySalary(LocalDate doj, double monthlySalary) {
-        // Financial year start and end dates
-        LocalDate financialYearStart = LocalDate.of(doj.getYear(), Month.APRIL, 1);
-        LocalDate financialYearEnd = LocalDate.of(doj.getYear() + 1, Month.MARCH, 31);
-
-        // Determine the start date for calculation based on DOJ
-        LocalDate startDate = doj.isBefore(financialYearStart) ? financialYearStart : doj;
-
-        // Calculate the number of months worked in the financial year
-        long monthsWorked = ChronoUnit.MONTHS.between(startDate.withDayOfMonth(1), financialYearEnd.withDayOfMonth(1)) + 1;
-
-        // Calculate the yearly salary based on months worked
-        return monthsWorked * monthlySalary;
+    private double calculateYearlySalary(Employee employee) {
+        LocalDate doj = employee.getDoj();
+        LocalDate today = LocalDate.now();
+        long monthsWorked = ChronoUnit.MONTHS.between(doj.withDayOfMonth(1), today.withDayOfMonth(1)) + 1; // Include the month of DOJ
+        return monthsWorked * employee.getSalary();
     }
 
-    // Calculate tax amount based on yearly salary and tax slabs
-    private double calculateTaxAmount(double yearlySalary) {
-        double tax = 0.0;
-
-        if (yearlySalary <= 250000) {
-            tax = 0;
-        } else if (yearlySalary <= 500000) {
-            tax = 0.05 * (yearlySalary - 250000);
+    private double calculateTax(double yearlySalary) {
+        double tax = 0;
+        if (yearlySalary <= 250000) return 0; // No tax
+        if (yearlySalary <= 500000) {
+            tax = (yearlySalary - 250000) * 0.05; // 5% on (yearlySalary - 250000)
         } else if (yearlySalary <= 1000000) {
-            tax = (0.05 * 250000) + (0.10 * (yearlySalary - 500000));
+            tax = 250000 * 0.05 + (yearlySalary - 500000) * 0.10; // 5% on 250000 and 10% on the rest
         } else {
-            tax = (0.05 * 250000) + (0.10 * 500000) + (0.20 * (yearlySalary - 1000000));
+            tax = 250000 * 0.05 + 500000 * 0.10 + (yearlySalary - 1000000) * 0.20; // 5% + 10% + 20%
         }
-
         return tax;
     }
 
-    // Calculate cess amount if the yearly salary exceeds 2,500,000
     private double calculateCess(double yearlySalary) {
-        double cess = 0.0;
-
-        // Apply 2% cess on the amount exceeding 2,500,000
-        if (yearlySalary > 2500000) {
-            cess = 0.02 * (yearlySalary - 2500000);
-        }
-
-        return cess;
+        return yearlySalary > 2500000 ? (yearlySalary - 2500000) * 0.02 : 0; // 2% cess on income above 2,500,000
     }
 }
